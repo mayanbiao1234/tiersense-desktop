@@ -1,0 +1,87 @@
+name: Windows preview release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - .github/workflows/windows-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-preview-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'mayanbiao1234/tiersense-desktop' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated build folders
+        run: |
+          $buildRoot = Join-Path $env:RUNNER_TEMP 'tierflow-build'
+          foreach ($folder in @('tmp', 'npm', 'electron', 'builder', 'profile')) {
+            New-Item -ItemType Directory -Path (Join-Path $buildRoot $folder) -Force | Out-Null
+          }
+          $settings = @{
+            TEMP = (Join-Path $buildRoot 'tmp')
+            TMP = (Join-Path $buildRoot 'tmp')
+            TMPDIR = (Join-Path $buildRoot 'tmp')
+            npm_config_cache = (Join-Path $buildRoot 'npm')
+            ELECTRON_CACHE = (Join-Path $buildRoot 'electron')
+            ELECTRON_BUILDER_CACHE = (Join-Path $buildRoot 'builder')
+            TIERFLOW_DATA_DIR = (Join-Path $buildRoot 'profile')
+          }
+          foreach ($entry in $settings.GetEnumerator()) { "$($entry.Key)=$($entry.Value)" >> $env:GITHUB_ENV }
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run tests
+        run: |
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Windows installer
+        run: |
+          $env:ELECTRON_BUILDER_7ZIP_PATH = Join-Path $env:GITHUB_WORKSPACE 'node_modules\electron-winstaller\vendor\7z.exe'
+          npm run installer
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish preview with checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Unexpected version format' }
+          $tag = "v$version"
+          $directory = Join-Path $env:GITHUB_WORKSPACE "release/$version"
+          $installer = Join-Path $directory "TierFlow-Setup-$version.exe"
+          $notes = Join-Path $env:GITHUB_WORKSPACE "docs/releases/$tag.md"
+          if (!(Test-Path -LiteralPath $installer) -or !(Test-Path -LiteralPath $notes)) { throw 'Release files missing' }
+          $checksum = Join-Path $directory 'SHA256SUMS.txt'
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText($checksum, "$hash  TierFlow-Setup-$version.exe`n", [Text.UTF8Encoding]::new($false))
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'This version already has a release. Existing assets are preserved; bump the version before publishing.' }
+          gh release create $tag $installer $checksum --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "TierFlow Desktop $version · Windows 体验版" --notes-file $notes --prerelease --draft
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation or upload failed' }
+          $release = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify release assets' }
+          if (@($release.assets | Where-Object name -eq "TierFlow-Setup-$version.exe").Count -ne 1 -or @($release.assets | Where-Object name -eq 'SHA256SUMS.txt').Count -ne 1) { throw 'Release assets incomplete; kept as draft' }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed' }
+          "### Windows 体验版 $version`n`n$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/releases/tag/$tag`n`nSHA-256: $hash" >> $env:GITHUB_STEP_SUMMARY

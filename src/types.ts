@@ -1,0 +1,25 @@
+import type { ProviderPresetId } from '../core/providers.mjs';
+export type Tier = string;
+export type Dimension = 'domain1' | 'domain2' | 'domain3' | 'domain4' | 'domain5';
+export interface TierDefinition { id: string; name: string; minScore: number }
+export interface RoutingRule { id: string; name: string; dimension: Dimension; operator: 'gte' | 'lt'; threshold: number; tierId: string; modelIds: string[]; enabled: boolean }
+export interface Routing { tiers: TierDefinition[]; rules: RoutingRule[] }
+export interface Scores { score: number; feature_scores: Record<Dimension, number> }
+export interface RouteDecision { tierId: string; tierName: string; ruleId: string; ruleName: string; preferredModelIds: string[]; reason: string }
+export interface Provider { id: string; name: string; baseUrl: string; enabled: boolean; preset: ProviderPresetId; hasKey: boolean; balanceMonitor?: boolean; balanceThreshold?: number; requestUsage?: boolean }
+export interface Pricing { currency: 'CNY' | 'USD'; input: number | null; output: number | null; cacheRead: number | null }
+export interface Model { id: string; name: string; model: string; providerId: string; tier: Tier; enabled: boolean; tools: boolean; vision: boolean; priority: number; pricing?: Pricing | null }
+export interface Settings { port: number; autoStart: boolean; zoomFactor: number; retainReasoning?: boolean; scoreTimeoutMs: number; requestTimeoutMs: number; allowEscalation: boolean; failureMode: 'block' | 'fallback'; fallbackModelId: string; tiersenseUrl: string }
+export interface RetryAttempt { model: string; provider: string; code: string; skipped: boolean; durationMs: number; status: number | null }
+export interface ModelAlert { modelId: string; providerId: string; code: string; message: string; retryAt: number }
+export interface Cost { amount: number | null; currency: string; source: 'unknown' | 'estimated'; note: string }
+export interface Log { scoreSource?: 'live' | 'cache' | 'shared'; modelMs?: number | null; upstreamWaitMs?: number | null; retryTrace?: RetryAttempt[]; id: string; time: number; status: 'pending' | 'success' | 'error' | 'cancelled'; model: string; modelId?: string; provider: string; providerId?: string; tier: Tier | ''; tierName?: string; featureScores?: Record<Dimension, number> | null; route?: RouteDecision | null; score: number | null; scoreMs: number; durationMs: number; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null; cachedTokens: number | null; reasoningTokens: number | null; cost?: Cost; pricing?: Pricing | null; fallback: boolean; attempts: number; error: string; code: string }
+export interface HistoryInfo { count: number; limit: number; days: number; revision: number; oldest: number | null; error: string }
+export interface Balance { supported: boolean; reason: string; status: 'idle' | 'unsupported' | 'ready' | 'error'; balances: { currency: string; total: number; cash: number | null; granted: number | null }[]; checkedAt: number | null; attemptedAt: number | null; error: string; refreshing: boolean; low: boolean }
+export interface UsageBucket { calls: number; success: number; inputTokens: number; outputTokens: number; inputSamples: number; outputSamples: number; totalTokens: number; cachedTokens: number; usageSamples: number; cacheSamples: number; cacheInputTokens: number; pricedCalls: number; costs: Record<string, number> }
+export interface Analytics extends UsageBucket { range: string; from: number; to: number; routedCalls: number; cacheHitRate: number | null; models: (UsageBucket & { key: string; model: string; provider: string; providerId: string; share: number })[]; trend: (UsageBucket & { date: string })[]; history: HistoryInfo }
+export interface State { modelAlerts?: ModelAlert[]; recoveryError?: string; platform: string; version: string | number; providers: Provider[]; models: Model[]; settings: Settings; routing: Routing; onboardingCompleted: boolean; hasTiersenseKey: boolean; account: { connected: boolean; backendAvailable: boolean; planPrice: number }; gateway: { running: boolean; port: number; active: number; startedAt: number | null; total: number; totalTokens: number | null }; logs: Log[]; history: HistoryInfo; balances: Record<string, Balance>; dataDir: string }
+export type Page = 'overview' | 'providers' | 'models' | 'routing' | 'connection' | 'logs' | 'analytics' | 'account' | 'settings' | 'setup' | 'help';
+declare global { interface Window { tierflow?: { platform: string; invoke: <T = unknown>(action: string, input?: unknown) => Promise<T>; subscribe: (callback: (state: State) => void) => () => void } } }
+
+export type API = { state: State; busy: boolean; act: (action: string, input?: unknown, success?: string) => Promise<unknown>; execute: (action: string, input?: unknown, success?: string) => void; notify: (text: string, error?: boolean) => void; copy: (value: string) => Promise<void>; setPage: (page: Page) => void; setModal: (modal: { type: string; data?: Provider | Model | Log } | null) => void; endpoint: string };

@@ -1,0 +1,27 @@
+node_modules/
+dist/
+release/
+.runtime/
+.build-temp/
+.build-cache/
+.env*
+*.log
+!.env.example
+
+# Local preferences, diagnostics and user data are never published.
+.npmrc
+handoff/
+docs/qa-*/
+docs/diagnostics-*/
+docs/*.png
+.publish/
+coverage/
+*.tmp
+*.pem
+*.key
+config.json
+usage-history.json
+window-state.json
+reasoning-history*
+Thumbs.db
+.DS_Store

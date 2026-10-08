@@ -1,0 +1,11 @@
+name: 提出改进建议
+description: 分享你的使用场景和期待的体验
+title: "[建议] "
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 你想解决什么问题？
+      description: "请说明场景、目前的操作方式，以及期待的改进。"
+    validations:
+      required: true

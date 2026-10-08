@@ -1,0 +1,30 @@
+name: 使用遇到问题
+description: 安装、连接、路由或界面出现异常
+title: "[问题] "
+body:
+  - type: markdown
+    attributes:
+      value: "请不要上传 API Key、配置文件或私密对话。错误信息和截图请先脱敏。"
+  - type: input
+    id: version
+    attributes:
+      label: 客户端版本与 Windows 版本
+      placeholder: "例如：TierFlow 0.4.10 / Windows 11 x64"
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: 使用的 AI 工具、渠道和模型
+      description: "填写名称和版本即可，不要提供密钥。"
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: "进行了哪些操作，期望出现什么，实际发生什么？"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 脱敏后的错误信息或截图
